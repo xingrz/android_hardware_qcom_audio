@@ -704,7 +704,7 @@ static int acdb_device_table[SND_DEVICE_MAX] = {
     [SND_DEVICE_IN_SPEAKER_QMIC_AEC_NS] = 129,
     [SND_DEVICE_IN_VOICE_REC_QMIC_FLUENCE] = 125,
     [SND_DEVICE_IN_THREE_MIC] = 46, /* for APSS Surround Sound Recording */
-    [SND_DEVICE_IN_HANDSET_TMIC_FLUENCE_PRO] = 125,
+    [SND_DEVICE_IN_HANDSET_TMIC_FLUENCE_PRO] = 138,
     [SND_DEVICE_IN_HANDSET_TMIC] = 153,
     [SND_DEVICE_IN_HANDSET_TMIC_AEC] = 154,
     [SND_DEVICE_IN_HANDSET_TMIC_NS] = 155,
@@ -5535,7 +5535,6 @@ bool platform_sound_trigger_usecase_needs_event(audio_usecase_t uc_id)
     case USECASE_VOICEMMODE1_CALL:
     case USECASE_VOICEMMODE2_CALL:
     case USECASE_COMPRESS_VOIP_CALL:
-    case USECASE_AUDIO_RECORD_FM_VIRTUAL:
     case USECASE_INCALL_REC_UPLINK:
     case USECASE_INCALL_REC_DOWNLINK:
     case USECASE_INCALL_REC_UPLINK_AND_DOWNLINK:
@@ -5544,8 +5543,6 @@ bool platform_sound_trigger_usecase_needs_event(audio_usecase_t uc_id)
     case USECASE_INCALL_REC_UPLINK_AND_DOWNLINK_COMPRESS:
     case USECASE_INCALL_MUSIC_UPLINK:
     case USECASE_INCALL_MUSIC_UPLINK2:
-    case USECASE_AUDIO_SPKR_CALIB_RX:
-    case USECASE_AUDIO_SPKR_CALIB_TX:
     case USECASE_AUDIO_RECORD_VOIP:
         needs_event = true;
         break;
@@ -6138,6 +6135,11 @@ static bool platform_check_codec_backend_cfg(struct audio_device* adev,
 
             ALOGD("%s:becf: afe: napb not active - set non fractional rate",
                        __func__);
+        }
+        /*ensure AFE set to 48khz when sample rate less than 44.1khz*/
+        if (sample_rate < OUTPUT_SAMPLING_RATE_44100) {
+            sample_rate = CODEC_BACKEND_DEFAULT_SAMPLE_RATE;
+            ALOGD("%s:becf: afe: napb set sample rate to default Sample Rate(48k)",__func__);
         }
     }
 
@@ -7775,7 +7777,6 @@ int platform_set_swap_mixer(struct audio_device *adev, bool swap_channels)
 {
     const char *mixer_ctl_name = "Swap channel";
     struct mixer_ctl *ctl;
-    const char *mixer_path;
     struct platform_data *my_data = (struct platform_data *)adev->platform;
 
     // forced to set to swap, but device not rotated ... ignore set
@@ -7783,13 +7784,6 @@ int platform_set_swap_mixer(struct audio_device *adev, bool swap_channels)
         return 0;
 
     ALOGV("%s:", __func__);
-
-    if (swap_channels)
-        mixer_path = platform_get_snd_device_name(SND_DEVICE_OUT_SPEAKER_REVERSE);
-    else
-        mixer_path = platform_get_snd_device_name(SND_DEVICE_OUT_SPEAKER);
-
-    audio_route_apply_and_update_path(adev->audio_route, mixer_path);
 
     ctl = mixer_get_ctl_by_name(adev->mixer, mixer_ctl_name);
     if (!ctl) {
